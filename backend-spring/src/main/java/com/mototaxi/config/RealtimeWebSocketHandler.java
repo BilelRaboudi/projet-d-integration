@@ -10,7 +10,6 @@ import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
 import java.io.IOException;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -21,20 +20,10 @@ import java.util.concurrent.ConcurrentHashMap;
 public class RealtimeWebSocketHandler extends TextWebSocketHandler {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
-
-    // Map: sessionId -> WebSocketSession
     private final Map<String, WebSocketSession> sessions = new ConcurrentHashMap<>();
-
-    // Map: userId -> sessionId
     private final Map<String, String> userSessions = new ConcurrentHashMap<>();
-
-    // Map: driverId -> sessionId (drivers currently online)
     private final Map<String, String> onlineDrivers = new ConcurrentHashMap<>();
-
-    // Set: admin sessionIds
     private final Set<String> adminSessions = ConcurrentHashMap.newKeySet();
-
-    // Map: rideId -> Set<sessionId>
     private final Map<String, Set<String>> rideRooms = new ConcurrentHashMap<>();
 
     @Override
@@ -55,39 +44,30 @@ public class RealtimeWebSocketHandler extends TextWebSocketHandler {
                 case "user:identify":
                     handleIdentify(session, data);
                     break;
-
                 case "driver:updateLocation":
                     handleDriverLocation(session, data);
                     break;
-
                 case "driver:online":
                     handleDriverOnline(session, data);
                     break;
-
                 case "driver:offline":
                     handleDriverOffline(session, data);
                     break;
-
                 case "ride:join":
                     handleRideJoin(session, data);
                     break;
-
                 case "ride:accepted":
                     handleRideAccepted(session, data);
                     break;
-
                 case "ride:rejected":
                     handleRideRejected(session, data);
                     break;
-
                 case "customer:sos":
                     handleCustomerSos(session, data);
                     break;
-
                 case "ping":
                     sendMessage(session, "pong", Map.of("time", System.currentTimeMillis()));
                     break;
-
                 default:
                     log.debug("[WebSocket] Evenement non gere: {}", event);
             }
@@ -127,12 +107,10 @@ public class RealtimeWebSocketHandler extends TextWebSocketHandler {
         payload.put("lng", lng);
         payload.put("timestamp", System.currentTimeMillis());
 
-        // Broadcast to ride room if in progress
         if (rideId != null && !rideId.isBlank()) {
             broadcastToRide(rideId, "driver:locationUpdated", payload);
         }
 
-        // Always broadcast location to admins
         broadcastToAdmins("driver:locationUpdated", payload);
     }
 
@@ -167,10 +145,9 @@ public class RealtimeWebSocketHandler extends TextWebSocketHandler {
 
     private void handleCustomerSos(WebSocketSession session, JsonNode data) {
         broadcastToAdmins("sos:alert", data);
-        log.warn("[WebSocket] ALERTE SOS recue: {}", data);
+        log.warn("[WebSocket] ALERTE SOS: {}", data);
     }
 
-    // Public broadcast helpers for Spring services
     public void broadcastNewRideRequest(Object rideData) {
         for (String sessionId : onlineDrivers.values()) {
             WebSocketSession s = sessions.get(sessionId);

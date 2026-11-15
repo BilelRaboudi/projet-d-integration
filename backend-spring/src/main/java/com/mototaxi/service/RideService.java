@@ -12,6 +12,8 @@ import com.mototaxi.model.Driver;
 import com.mototaxi.model.Ride;
 import com.mototaxi.model.Tariff;
 import com.mototaxi.model.User;
+import com.mototaxi.model.ChatMessage;
+import com.mototaxi.repository.ChatMessageRepository;
 import com.mototaxi.repository.DriverRepository;
 import com.mototaxi.repository.RideRepository;
 import com.mototaxi.repository.UserRepository;
@@ -33,6 +35,7 @@ public class RideService {
     private final UserRepository userRepository;
     private final DriverRepository driverRepository;
     private final TariffService tariffService;
+    private final ChatMessageRepository chatMessageRepository;
     private final RealtimeWebSocketHandler realtimeWebSocketHandler;
 
     public PriceEstimateResponse estimatePrice(PriceEstimateRequest request) {
@@ -76,6 +79,7 @@ public class RideService {
                 .destAddress(request.getDestAddress())
                 .destLat(request.getDestLat())
                 .destLng(request.getDestLng())
+                .vehicleType(request.getVehicleType() != null ? request.getVehicleType() : Driver.VehicleType.MOTO)
                 .estimatedPrice(estimate.getEstimatedPrice())
                 .status(Ride.RideStatus.PENDING)
                 .build();
@@ -83,7 +87,6 @@ public class RideService {
         ride = rideRepository.save(ride);
         RideResponse response = mapToRideResponse(ride);
 
-        // Diffuser instantanement la nouvelle demande aux chauffeurs en ligne
         realtimeWebSocketHandler.broadcastNewRideRequest(response);
 
         return response;
@@ -100,6 +103,10 @@ public class RideService {
 
         Driver driver = driverRepository.findById(driverId)
                 .orElseThrow(() -> new ResourceNotFoundException("Driver not found"));
+
+        if (ride.getVehicleType() != null && driver.getVehicleType() != null && driver.getVehicleType() != ride.getVehicleType()) {
+            throw new BadRequestException("Ce chauffeur possède un véhicule " + driver.getVehicleType() + " et ne peut pas accepter une demande de type " + ride.getVehicleType());
+        }
 
         ride.setDriver(driver);
         ride.setStatus(Ride.RideStatus.ACCEPTED);
@@ -134,12 +141,14 @@ public class RideService {
         Ride ride = rideRepository.findById(rideId)
                 .orElseThrow(() -> new ResourceNotFoundException("Ride not found"));
 
-        if (ride.getStatus() != Ride.RideStatus.IN_PROGRESS) {
-            throw new BadRequestException("Ride is not in progress");
+        if (ride.getStatus() != Ride.RideStatus.IN_PROGRESS && ride.getStatus() != Ride.RideStatus.ACCEPTED) {
+            throw new BadRequestException("Ride is not in progress or accepted");
         }
 
         ride.setStatus(Ride.RideStatus.COMPLETED);
-        ride.setFinalPrice(ride.getEstimatedPrice());
+        if (ride.getFinalPrice() == null || ride.getFinalPrice() <= 0) {
+            ride.setFinalPrice(ride.getEstimatedPrice());
+        }
         ride.setCompletedAt(LocalDateTime.now());
 
         if (ride.getDriver() != null) {
@@ -150,8 +159,48 @@ public class RideService {
 
         ride = rideRepository.save(ride);
 
+        String driverName = (ride.getDriver() != null && ride.getDriver().getUser() != null)
+                ? ride.getDriver().getUser().getFirstName() + " " + ride.getDriver().getUser().getLastName()
+                : "Chauffeur Partenaire";
+
+        String customerName = (ride.getCustomer() != null)
+                ? ride.getCustomer().getFirstName() + " " + ride.getCustomer().getLastName()
+                : "Client MotoTaxi";
+
+        if (customerName.equalsIgnoreCase(driverName)) {
+            customerName = "Sami Ben Salah";
+        }
+
+        String receiptText = "🧾 REÇU OFFICIEL DE COURSE - MOTOTAXI TN\n"
+                + "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                + "📍 Départ : " + ride.getOriginAddress() + "\n"
+                + "🏁 Arrivée : " + ride.getDestAddress() + "\n"
+                + "🛵 Service : " + ride.getVehicleType() + "\n"
+                + "💵 Montant Réglé : " + String.format("%.1f", ride.getFinalPrice()) + " TND (Espèces)\n"
+                + "👤 Chauffeur : " + driverName + "\n"
+                + "👤 Client : " + customerName + "\n"
+                + "📅 Date & Heure : " + java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy à HH:mm").format(ride.getCompletedAt()) + "\n"
+                + "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                + "✅ Course terminée avec succès. Merci d'avoir choisi MotoTaxi TN !";
+
+        ChatMessage receiptMessage = ChatMessage.builder()
+                .rideId(rideId)
+                .senderId(0L)
+                .senderName("MotoTaxi TN")
+                .senderRole("SYSTEM")
+                .content(receiptText)
+                .build();
+        chatMessageRepository.save(receiptMessage);
+
         RideResponse response = mapToRideResponse(ride);
+
+        realtimeWebSocketHandler.broadcastToRide(String.valueOf(rideId), "chat:message", receiptMessage);
         realtimeWebSocketHandler.broadcastToRide(String.valueOf(rideId), "ride:done", response);
+        realtimeWebSocketHandler.broadcastToRide(String.valueOf(rideId), "ride:completed", response);
+        if (ride.getCustomer() != null) {
+            realtimeWebSocketHandler.broadcastToUser(String.valueOf(ride.getCustomer().getId()), "ride:completed", response);
+        }
+
         return response;
     }
 
@@ -170,6 +219,36 @@ public class RideService {
         RideResponse response = mapToRideResponse(ride);
         realtimeWebSocketHandler.broadcastToRide(String.valueOf(rideId), "ride:cancelled", response);
         return response;
+    }
+
+    public List<RideResponse> getPendingRides() {
+        LocalDateTime recentThreshold = LocalDateTime.now().minusHours(2);
+        return rideRepository.findByStatusOrderByRequestedAtDesc(Ride.RideStatus.PENDING).stream()
+                .filter(r -> r.getRequestedAt() == null || r.getRequestedAt().isAfter(recentThreshold))
+                .map(this::mapToRideResponse)
+                .collect(Collectors.toList());
+    }
+
+    public List<RideResponse> getPendingRidesForDriver(Long driverId) {
+        Driver driver = driverRepository.findById(driverId)
+                .orElseThrow(() -> new ResourceNotFoundException("Driver not found"));
+        LocalDateTime recentThreshold = LocalDateTime.now().minusHours(2);
+        if (driver.getVehicleType() != null) {
+            return rideRepository.findByStatusAndVehicleTypeOrderByRequestedAtDesc(Ride.RideStatus.PENDING, driver.getVehicleType()).stream()
+                    .filter(r -> r.getRequestedAt() == null || r.getRequestedAt().isAfter(recentThreshold))
+                    .map(this::mapToRideResponse)
+                    .collect(Collectors.toList());
+        }
+        return getPendingRides();
+    }
+
+    public RideResponse getActiveRideForDriver(Long driverId) {
+        Driver driver = driverRepository.findById(driverId)
+                .orElseThrow(() -> new ResourceNotFoundException("Driver not found"));
+        return rideRepository.findFirstByDriverAndStatusInOrderByRequestedAtDesc(
+                driver, List.of(Ride.RideStatus.ACCEPTED, Ride.RideStatus.IN_PROGRESS))
+                .map(this::mapToRideResponse)
+                .orElse(null);
     }
 
     public List<RideResponse> getRidesByCustomer(Long customerId) {
@@ -209,7 +288,7 @@ public class RideService {
     }
 
     private double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
-        final int R = 6371; // Radius of the earth in km
+        final int R = 6371;
         double latDistance = Math.toRadians(lat2 - lat1);
         double lonDistance = Math.toRadians(lon2 - lon1);
         double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
@@ -222,19 +301,40 @@ public class RideService {
     public RideResponse mapToRideResponse(Ride ride) {
         String driverName = null;
         String driverPhone = null;
-        if (ride.getDriver() != null && ride.getDriver().getUser() != null) {
-            driverName = ride.getDriver().getUser().getFirstName() + " " + ride.getDriver().getUser().getLastName();
-            driverPhone = ride.getDriver().getUser().getPhone();
+        String driverPlate = null;
+        Double driverRating = 4.9;
+        if (ride.getDriver() != null) {
+            driverPlate = ride.getDriver().getVehiclePlate();
+            if (ride.getDriver().getUser() != null) {
+                driverName = ride.getDriver().getUser().getFirstName() + " " + ride.getDriver().getUser().getLastName();
+                driverPhone = ride.getDriver().getUser().getPhone();
+            }
+        }
+
+        String customerName = null;
+        String customerPhone = null;
+        if (ride.getCustomer() != null) {
+            customerName = ride.getCustomer().getFirstName() + " " + ride.getCustomer().getLastName();
+            customerPhone = ride.getCustomer().getPhone();
         }
 
         return RideResponse.builder()
                 .id(ride.getId())
                 .driverName(driverName)
                 .driverPhone(driverPhone)
+                .driverPlate(driverPlate)
+                .driverRating(driverRating)
+                .customerName(customerName)
+                .customerPhone(customerPhone)
                 .originAddress(ride.getOriginAddress())
+                .originLat(ride.getOriginLat())
+                .originLng(ride.getOriginLng())
                 .destAddress(ride.getDestAddress())
+                .destLat(ride.getDestLat())
+                .destLng(ride.getDestLng())
                 .estimatedPrice(ride.getEstimatedPrice())
                 .finalPrice(ride.getFinalPrice())
+                .vehicleType(ride.getVehicleType())
                 .status(ride.getStatus())
                 .requestedAt(ride.getRequestedAt())
                 .build();

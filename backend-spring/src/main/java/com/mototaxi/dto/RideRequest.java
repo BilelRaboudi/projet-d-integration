@@ -28,4 +28,6 @@ public class RideRequest {
 
     @NotNull(message = "Vehicle type is required")
     private Driver.VehicleType vehicleType;
+
+    private Long customerId;
 }

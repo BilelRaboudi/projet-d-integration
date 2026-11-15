@@ -3,7 +3,7 @@
   <!-- Top Metrics Row (Responsive 1 -> 3 columns) -->
   <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
     
-    <!-- Big Yellow Gains Card (Gains du jour 87,5 TND) -->
+    <!-- Big Yellow Gains Card -->
     <div class="bg-[#F5C518] rounded-3xl p-6 shadow-md relative overflow-hidden text-[#1A1A1A] flex flex-col justify-between">
       <div>
         <div class="flex items-center justify-between text-xs font-black uppercase tracking-wider mb-2 opacity-80">
@@ -19,7 +19,7 @@
 
       <div class="mt-4 pt-3 border-t border-black/10 flex items-center justify-between text-xs font-bold opacity-85">
         <span>Gains totaux cumulés :</span>
-        <span class="font-black">1 280,0 TND</span>
+        <span class="font-black">{{ totalEarnings | number:'1.1-1' }} TND</span>
       </div>
 
       <div class="absolute -right-6 -bottom-6 w-28 h-28 bg-white/10 rounded-full pointer-events-none"></div>
@@ -32,15 +32,15 @@
           <i class="fa-solid fa-award text-yellow-500 text-base"></i>
           <span class="uppercase tracking-wider">Courses complétées</span>
         </div>
-        <span class="bg-green-50 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded-full">+3 cette heure</span>
+        <span class="bg-green-50 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded-full">+{{ todayRidesCount }} aujourd'hui</span>
       </div>
       <div>
         <p class="text-4xl sm:text-5xl font-black text-gray-900 leading-none mt-2">{{ todayRidesCount }}</p>
         <span class="text-xs text-gray-400 font-semibold block mt-1">Courses réalisées aujourd'hui</span>
       </div>
       <div class="mt-4 pt-3 border-t border-gray-100 text-xs text-gray-500 font-semibold flex justify-between">
-        <span>Objectif quotidien (20) :</span>
-        <span class="font-bold text-gray-900">75% atteint</span>
+        <span>Statut flotte :</span>
+        <span class="font-bold text-emerald-600">{{ isOnline ? 'Actif en service' : 'Hors ligne' }}</span>
       </div>
     </div>
 
@@ -77,22 +77,89 @@
   <!-- Main Section: 2 Columns on Desktop / Stacked on Mobile -->
   <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
     
-    <!-- Left Column: Ride Request Card & Driver Tools -->
+    <!-- Left Column: Active Ride / Incoming Request / Waiting radar -->
     <div class="lg:col-span-5 space-y-4">
       
-      <!-- Nouvelle demande de course (Matching Mockup) -->
-      <div *ngIf="hasNewRequest" class="bg-white rounded-3xl p-6 shadow-md border-2 border-yellow-300 relative overflow-hidden transition-all duration-300">
+      <!-- 1. ACTIVE RIDE IN PROGRESS (Recorded in DB) -->
+      <div *ngIf="activeRide" class="bg-white rounded-3xl p-6 shadow-lg border-2 border-emerald-400 relative overflow-hidden transition-all duration-300">
         <div class="flex items-start justify-between mb-4">
           <div>
-            <span class="text-xs font-extrabold uppercase tracking-wider text-yellow-600 bg-yellow-50 px-2.5 py-1 rounded-full border border-yellow-200">
-              ⚡ Nouvelle demande de course
+            <span class="text-xs font-extrabold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 flex items-center gap-1.5 w-fit">
+              <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+              {{ activeRide.status === 'ACCEPTED' ? 'Course acceptée' : 'Course en cours' }}
+            </span>
+            <div class="flex items-center gap-2 mt-3 text-base font-black text-gray-900">
+              <span>{{ activeRide.originAddress }}</span>
+              <i class="fa-solid fa-arrow-right text-xs text-gray-400"></i>
+              <span>{{ activeRide.destAddress }}</span>
+            </div>
+            <p class="text-xs text-gray-600 mt-1.5 flex items-center gap-2">
+              <i class="fa-solid fa-user text-gray-400"></i>
+              <span class="font-bold">{{ activeRide.customerName || 'Client MotoTaxi' }}</span>
+              <a *ngIf="activeRide.customerPhone" [href]="'tel:' + activeRide.customerPhone" class="text-blue-600 font-bold hover:underline">
+                <i class="fa-solid fa-phone text-[10px] ml-1"></i> {{ activeRide.customerPhone }}
+              </a>
+            </p>
+          </div>
+          
+          <div class="w-12 h-12 rounded-2xl bg-emerald-500 text-white flex items-center justify-center text-xl shadow-md shrink-0">
+            <i class="fa-solid fa-location-arrow"></i>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between pt-4 border-t border-gray-100 mt-2">
+          <div class="text-xl font-black text-emerald-700">
+            {{ (activeRide.finalPrice || activeRide.estimatedPrice) | number:'1.1-1' }} <span class="text-xs font-bold text-gray-500">TND</span>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <!-- Chat button -->
+            <button 
+              (click)="toggleChat()"
+              class="px-3.5 py-2.5 rounded-xl text-xs font-black text-gray-800 bg-gray-100 hover:bg-gray-200 transition active:scale-95 flex items-center gap-1.5"
+              title="Envoyer un message au client">
+              <i class="fa-solid fa-comment-dots text-sm text-[#F5C518]"></i>
+              <span class="hidden sm:inline">Message</span>
+            </button>
+
+            <!-- Start button if ACCEPTED -->
+            <button 
+              *ngIf="activeRide.status === 'ACCEPTED'"
+              (click)="startActiveRide()"
+              class="px-5 py-2.5 rounded-xl text-xs font-black text-white bg-blue-600 hover:bg-blue-700 shadow-md transition active:scale-95 flex items-center gap-1.5">
+              <i class="fa-solid fa-play"></i>
+              <span>Démarrer</span>
+            </button>
+
+            <!-- Complete button if IN_PROGRESS -->
+            <button 
+              *ngIf="activeRide.status === 'IN_PROGRESS'"
+              (click)="completeActiveRide()"
+              class="px-5 py-2.5 rounded-xl text-xs font-black text-[#1A1A1A] bg-[#F5C518] hover:bg-[#E5B50A] shadow-md transition active:scale-95 flex items-center gap-1.5">
+              <i class="fa-solid fa-flag-checkered"></i>
+              <span>Terminer & Encaisser</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. NOUVELLE DEMANDE DE COURSE (From Real DB / WebSocket) -->
+      <div *ngIf="!activeRide && hasNewRequest && incomingRequest" class="bg-white rounded-3xl p-6 shadow-md border-2 border-yellow-300 relative overflow-hidden transition-all duration-300 animate-fadeIn">
+        <div class="flex items-start justify-between mb-4">
+          <div>
+            <span class="text-xs font-extrabold uppercase tracking-wider text-yellow-700 bg-yellow-50 px-2.5 py-1 rounded-full border border-yellow-200">
+              ⚡ Nouvelle demande de course #{{ incomingRequest.id }}
             </span>
             <div class="flex items-center gap-2 mt-3 text-sm font-black text-gray-900">
-              <span>{{ incomingRequest.origin }}</span>
+              <span>{{ incomingRequest.originAddress }}</span>
               <i class="fa-solid fa-arrow-right text-xs text-gray-400"></i>
-              <span>{{ incomingRequest.destination }}</span>
+              <span>{{ incomingRequest.destAddress }}</span>
             </div>
-            <p class="text-xs text-gray-400 mt-1">Client à 450m • Durée estimée : 12 min</p>
+            <p class="text-xs text-gray-500 mt-1 flex items-center gap-1.5">
+              <i class="fa-solid fa-user text-gray-400 text-[11px]"></i>
+              <span>Client : <strong>{{ incomingRequest.customerName || 'Client' }}</strong></span>
+              <span *ngIf="incomingRequest.customerPhone">({{ incomingRequest.customerPhone }})</span>
+            </p>
           </div>
           
           <div class="w-12 h-12 rounded-2xl bg-[#F5C518] flex items-center justify-center text-[#1A1A1A] text-xl shadow-md shrink-0">
@@ -103,7 +170,7 @@
         <!-- Price and Buttons Row -->
         <div class="flex items-center justify-between pt-4 border-t border-gray-100 mt-2">
           <div class="text-xl font-black text-gray-900">
-            {{ incomingRequest.price | number:'1.1-1' }} <span class="text-xs font-bold text-gray-500">TND</span>
+            {{ incomingRequest.estimatedPrice | number:'1.1-1' }} <span class="text-xs font-bold text-gray-500">TND</span>
           </div>
 
           <div class="flex items-center gap-2.5">
@@ -122,7 +189,21 @@
         </div>
       </div>
 
-      <!-- Driver Quick Controls on Widescreen -->
+      <!-- 3. EN ATTENTE DE NOUVELLES DEMANDES (When no active or pending) -->
+      <div *ngIf="!activeRide && !hasNewRequest" class="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 text-center space-y-3">
+        <div class="w-14 h-14 mx-auto rounded-full bg-yellow-50 flex items-center justify-center text-[#F5C518] text-xl">
+          <i class="fa-solid fa-radar animate-pulse text-2xl"></i>
+        </div>
+        <h4 class="text-sm font-black text-gray-900">À l'écoute des courses</h4>
+        <p class="text-xs text-gray-400 max-w-xs mx-auto">
+          Votre position GPS est partagée. Vous recevrez les demandes des clients dès qu'ils commandent.
+        </p>
+        <button (click)="checkForPendingDemands()" class="px-3.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold transition">
+          <i class="fa-solid fa-arrows-rotate mr-1"></i> Actualiser les demandes
+        </button>
+      </div>
+
+      <!-- Driver Quick Controls -->
       <div class="bg-white rounded-3xl p-5 shadow-sm border border-gray-100 space-y-3">
         <h3 class="text-xs font-extrabold uppercase tracking-wider text-gray-700">Paramètres rapides</h3>
         <div class="flex items-center justify-between py-2 border-b border-gray-100 text-xs">
@@ -135,25 +216,25 @@
         </div>
         <div class="flex items-center justify-between py-1 text-xs">
           <span class="font-bold text-gray-700">Zone de service</span>
-          <span class="font-bold text-gray-900">Tunis Centre & Banlieue</span>
+          <span class="font-bold text-gray-900">Grand Tunis</span>
         </div>
       </div>
 
     </div>
 
-    <!-- Right Column: Recent Trips Table / List -->
+    <!-- Right Column: Recent Trips Table / List from DB -->
     <div class="lg:col-span-7 bg-white rounded-3xl shadow-sm border border-gray-100 p-6">
       <div class="flex items-center justify-between mb-4 pb-3 border-b border-gray-100">
         <div>
           <h3 class="text-base font-black text-gray-900">Courses d'aujourd'hui</h3>
-          <p class="text-xs text-gray-400">Historique des trajets réalisés et encaissés</p>
+          <p class="text-xs text-gray-400">Historique des trajets récents enregistrés en base</p>
         </div>
         <span class="text-xs font-bold text-gray-500 bg-gray-50 px-3 py-1 rounded-full border border-gray-200">
           {{ recentTrips.length }} enregistrements
         </span>
       </div>
 
-      <div class="space-y-3">
+      <div class="space-y-3" *ngIf="recentTrips.length > 0">
         <div *ngFor="let trip of recentTrips" class="p-3.5 rounded-2xl hover:bg-gray-50/80 transition border border-gray-100 flex items-center justify-between text-xs">
           <div class="flex items-center gap-4">
             <div class="w-10 h-10 rounded-2xl bg-gray-100 flex items-center justify-center text-gray-600 font-bold text-xs shrink-0">
@@ -168,7 +249,10 @@
               <div class="flex items-center gap-2 text-gray-400 text-[11px] mt-0.5">
                 <span><i class="fa-regular fa-clock mr-1"></i>{{ trip.time }}</span>
                 <span>•</span>
-                <span class="text-green-600 font-semibold"><i class="fa-solid fa-circle-check text-[9px] mr-1"></i>Encaissé</span>
+                <span [ngClass]="trip.status === 'COMPLETED' ? 'text-green-600 font-semibold' : 'text-yellow-600 font-semibold'">
+                  <i class="fa-solid fa-circle-check text-[9px] mr-1"></i>
+                  {{ trip.status === 'COMPLETED' ? 'Encaissé' : trip.status }}
+                </span>
               </div>
             </div>
           </div>
@@ -180,6 +264,131 @@
           </div>
         </div>
       </div>
+
+      <div *ngIf="recentTrips.length === 0" class="py-12 text-center text-gray-400 text-xs">
+        <i class="fa-solid fa-receipt text-3xl mb-2 text-gray-300 block"></i>
+        Aucune course enregistrée pour aujourd'hui. Vos courses apparaîtront ici dès que vous les terminez.
+      </div>
+    </div>
+
+  </div>
+
+  <!-- BOUTON FLOTTANT : MESSAGES & REÇUS DU CHAUFFEUR -->
+  <div class="fixed bottom-8 right-8" style="z-index: 99999 !important;">
+    <button 
+      (click)="toggleChat()"
+      class="bg-[#F5C518] hover:bg-[#E5B50A] text-[#1A1A1A] px-5 py-3.5 rounded-full shadow-2xl flex items-center gap-2.5 font-black text-xs border-2 border-[#1A1A1A] transition hover:scale-105 active:scale-95 cursor-pointer">
+      <div class="relative flex items-center justify-center">
+        <i class="fa-solid fa-comment-dots text-base text-[#1A1A1A]"></i>
+      </div>
+      <span>Messages & Reçus</span>
+      <span *ngIf="chatMessages.length > 0" class="bg-[#1A1A1A] text-[#F5C518] text-[10px] font-black px-1.5 py-0.5 rounded-full">
+        {{ chatMessages.length }}
+      </span>
+    </button>
+  </div>
+
+  <!-- SLIDING CHAT NAVIGATION / DRAWER (Messagerie Chauffeur <-> Client) -->
+  <div 
+    *ngIf="isChatOpen" 
+    class="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-end transition-opacity duration-300"
+    style="z-index: 100000 !important;">
+    
+    <div class="w-full sm:w-[420px] bg-white h-full shadow-2xl flex flex-col justify-between">
+      
+      <!-- Chat Header -->
+      <div class="bg-[#1A1A1A] text-white p-4 flex items-center justify-between border-b border-white/10">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-full bg-[#F5C518] text-[#1A1A1A] font-black flex items-center justify-center text-xs shadow shrink-0">
+            <i class="fa-solid fa-user"></i>
+          </div>
+          <div>
+            <span class="text-[10px] uppercase tracking-wider font-extrabold text-[#F5C518] block">Client</span>
+            <h4 class="text-sm font-black text-white leading-tight">
+              {{ getClientDisplayName() }}
+            </h4>
+            <span class="text-[10px] text-gray-400 font-medium flex items-center gap-1 mt-0.5">
+              <span class="w-1.5 h-1.5 rounded-full" [ngClass]="activeRide ? 'bg-emerald-400 animate-pulse' : 'bg-gray-400'"></span>
+              Course {{ activeRide ? 'en cours' : 'clôturée' }} #{{ (activeRide?.id || lastCompletedRide?.id || '') }}
+            </span>
+          </div>
+        </div>
+
+        <button 
+          (click)="toggleChat()" 
+          class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-gray-300 hover:text-white flex items-center justify-center transition">
+          <i class="fa-solid fa-xmark text-sm"></i>
+        </button>
+      </div>
+
+      <!-- Messages Scroll Area -->
+      <div class="flex-1 p-4 overflow-y-auto space-y-3 bg-[#F8F9FA]">
+        
+        <div *ngIf="chatMessages.length === 0" class="py-12 text-center text-gray-400 text-xs space-y-2">
+          <i class="fa-regular fa-comments text-3xl text-gray-300 block"></i>
+          <p>Aucun message échangé.</p>
+          <p class="text-[11px]">Prévenez votre client de votre arrivée ou de votre position.</p>
+        </div>
+
+        <!-- Messages & Reçus -->
+        <div *ngFor="let msg of chatMessages" class="flex flex-col" [ngClass]="msg.senderRole === 'DRIVER' ? 'items-end' : 'items-start'">
+          
+          <!-- Reçu officiel -->
+          <div *ngIf="isReceiptMessage(msg)" class="w-full my-2">
+            <div class="bg-white border-2 border-emerald-400 rounded-3xl p-5 shadow-sm text-left">
+              <div class="flex items-center justify-between pb-2 border-b border-gray-100">
+                <span class="text-[11px] font-black uppercase text-emerald-700">🧾 Reçu Clôturé & Encaissé</span>
+                <span class="text-[10px] bg-emerald-50 text-emerald-800 font-bold px-2 py-0.5 rounded-full">Course Réussie</span>
+              </div>
+              <div class="mt-2.5 whitespace-pre-line text-xs font-mono text-gray-700 leading-relaxed bg-gray-50 p-3 rounded-2xl border border-gray-100">
+                {{ msg.content }}
+              </div>
+            </div>
+          </div>
+
+          <!-- Bulle classique -->
+          <div *ngIf="!isReceiptMessage(msg)" class="flex flex-col max-w-[80%]" [ngClass]="msg.senderRole === 'DRIVER' ? 'items-end' : 'items-start'">
+            <span class="text-[10px] font-bold text-gray-400 mb-0.5 px-1">{{ msg.senderName }}</span>
+            <div 
+              class="px-4 py-2.5 rounded-2xl text-xs leading-relaxed shadow-sm"
+              [ngClass]="msg.senderRole === 'DRIVER' ? 'bg-[#F5C518] text-[#1A1A1A] font-bold rounded-br-sm' : 'bg-white text-gray-800 border border-gray-200 rounded-bl-sm'">
+              {{ msg.content }}
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Quick replies chips for driver -->
+      <div class="px-4 py-2 bg-white border-t border-gray-100 flex gap-2 overflow-x-auto text-[11px]">
+        <button (click)="sendQuickReply('J\'arrive dans 2 minutes !')" class="whitespace-nowrap px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-full font-bold text-gray-700 transition">
+          J'arrive dans 2 min
+        </button>
+        <button (click)="sendQuickReply('Je suis devant l\'adresse')" class="whitespace-nowrap px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-full font-bold text-gray-700 transition">
+          Je suis devant
+        </button>
+        <button (click)="sendQuickReply('Quel est votre repère ?')" class="whitespace-nowrap px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-full font-bold text-gray-700 transition">
+          Votre repère ?
+        </button>
+      </div>
+
+      <!-- Input Bar -->
+      <div class="p-3 bg-white border-t border-gray-200 flex items-center gap-2">
+        <input 
+          type="text" 
+          [(ngModel)]="newTextMessage"
+          (keyup.enter)="sendChatMessage()"
+          placeholder="Écrire au client..."
+          class="flex-1 bg-gray-100 border border-gray-200 rounded-xl px-4 py-2.5 text-xs font-medium text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#F5C518]">
+        
+        <button 
+          (click)="sendChatMessage()"
+          [disabled]="!newTextMessage.trim() || isSendingMessage"
+          class="w-10 h-10 rounded-xl bg-[#F5C518] hover:bg-[#E5B50A] text-[#1A1A1A] flex items-center justify-center shadow-md transition disabled:opacity-40">
+          <i class="fa-solid fa-paper-plane text-xs"></i>
+        </button>
+      </div>
+
     </div>
 
   </div>

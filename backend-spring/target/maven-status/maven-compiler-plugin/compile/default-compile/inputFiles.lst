@@ -17,10 +17,12 @@ C:\Users\RABOUDI\Desktop\projet integration\backend-spring\src\main\java\com\mot
 C:\Users\RABOUDI\Desktop\projet integration\backend-spring\src\main\java\com\mototaxi\security\JwtAuthFilter.java
 C:\Users\RABOUDI\Desktop\projet integration\backend-spring\src\main\java\com\mototaxi\model\Rating.java
 C:\Users\RABOUDI\Desktop\projet integration\backend-spring\src\main\java\com\mototaxi\service\TariffService.java
+C:\Users\RABOUDI\Desktop\projet integration\backend-spring\src\main\java\com\mototaxi\controller\ChatController.java
 C:\Users\RABOUDI\Desktop\projet integration\backend-spring\src\main\java\com\mototaxi\dto\AuthRequest.java
 C:\Users\RABOUDI\Desktop\projet integration\backend-spring\src\main\java\com\mototaxi\security\UserDetailsServiceImpl.java
 C:\Users\RABOUDI\Desktop\projet integration\backend-spring\src\main\java\com\mototaxi\controller\AdminController.java
 C:\Users\RABOUDI\Desktop\projet integration\backend-spring\src\main\java\com\mototaxi\service\AuthService.java
+C:\Users\RABOUDI\Desktop\projet integration\backend-spring\src\main\java\com\mototaxi\model\ChatMessage.java
 C:\Users\RABOUDI\Desktop\projet integration\backend-spring\src\main\java\com\mototaxi\exception\ResourceNotFoundException.java
 C:\Users\RABOUDI\Desktop\projet integration\backend-spring\src\main\java\com\mototaxi\model\Tariff.java
 C:\Users\RABOUDI\Desktop\projet integration\backend-spring\src\main\java\com\mototaxi\service\UserService.java
@@ -31,6 +33,7 @@ C:\Users\RABOUDI\Desktop\projet integration\backend-spring\src\main\java\com\mot
 C:\Users\RABOUDI\Desktop\projet integration\backend-spring\src\main\java\com\mototaxi\controller\DriverController.java
 C:\Users\RABOUDI\Desktop\projet integration\backend-spring\src\main\java\com\mototaxi\repository\PaymentRepository.java
 C:\Users\RABOUDI\Desktop\projet integration\backend-spring\src\main\java\com\mototaxi\config\RealtimeWebSocketHandler.java
+C:\Users\RABOUDI\Desktop\projet integration\backend-spring\src\main\java\com\mototaxi\repository\ChatMessageRepository.java
 C:\Users\RABOUDI\Desktop\projet integration\backend-spring\src\main\java\com\mototaxi\dto\RideResponse.java
 C:\Users\RABOUDI\Desktop\projet integration\backend-spring\src\main\java\com\mototaxi\MototaxiApiApplication.java
 C:\Users\RABOUDI\Desktop\projet integration\backend-spring\src\main\java\com\mototaxi\controller\PaymentController.java

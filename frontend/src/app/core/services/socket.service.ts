@@ -43,7 +43,10 @@ export class SocketService {
         if (stored) {
           try {
             const user = JSON.parse(stored);
-            this.emit('user:identify', { userId: String(user.id), role: user.role });
+            const uid = user.userId || user.id;
+            if (uid) {
+              this.emit('user:identify', { userId: String(uid), role: user.role });
+            }
           } catch {}
         }
       };

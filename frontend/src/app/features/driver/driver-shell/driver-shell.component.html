@@ -12,23 +12,33 @@
         <div>
           <div class="flex items-center gap-2">
             <h2 class="text-sm sm:text-base font-black text-white leading-tight">
-              {{ authService.currentUser()?.fullName || 'Amine Jlassi' }}
+              {{ driver?.user ? (driver!.user.firstName + ' ' + driver!.user.lastName) : (authService.currentUser()?.fullName || 'Chauffeur') }}
             </h2>
             <span class="bg-[#F5C518] text-[#1A1A1A] text-[10px] font-black uppercase px-2 py-0.5 rounded-md">
               Chauffeur Partenaire
             </span>
           </div>
-          <p class="text-[11px] text-gray-400 font-medium">Moto #178 TU 3144 • Grand Tunis</p>
+          <p class="text-[11px] text-gray-400 font-medium">
+            {{ driver?.vehicleType || 'MOTO' }} #{{ driver?.vehiclePlate || '178 TU 3144' }} • Grand Tunis
+          </p>
         </div>
       </div>
 
       <!-- Right: Availability status, Desktop navigation & Logout -->
       <div class="flex items-center gap-3 sm:gap-6">
-        <!-- Status Toggle -->
-        <div class="flex items-center gap-2 bg-[#262626] px-3.5 py-1.5 rounded-full border border-white/10">
-          <div class="w-2.5 h-2.5 rounded-full bg-[#10B981] animate-pulse"></div>
-          <span class="text-xs font-bold text-gray-200">En service</span>
-        </div>
+        <!-- Interactive Status Toggle -->
+        <button 
+          (click)="toggleAvailability()" 
+          title="Cliquer pour changer votre statut"
+          class="flex items-center gap-2 px-3.5 py-1.5 rounded-full border transition cursor-pointer"
+          [ngClass]="driver?.available ? 'bg-emerald-950/60 border-emerald-500/30 hover:bg-emerald-900/60' : 'bg-gray-800 border-gray-700 hover:bg-gray-700'">
+          <div 
+            class="w-2.5 h-2.5 rounded-full" 
+            [ngClass]="driver?.available ? 'bg-[#10B981] animate-pulse' : 'bg-gray-500'"></div>
+          <span class="text-xs font-bold" [ngClass]="driver?.available ? 'text-emerald-300' : 'text-gray-400'">
+            {{ driver?.available ? 'En service' : 'Hors service' }}
+          </span>
+        </button>
 
         <!-- Desktop Links -->
         <nav class="hidden md:flex items-center gap-1 text-xs font-bold text-gray-400">

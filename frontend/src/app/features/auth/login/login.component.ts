@@ -28,8 +28,7 @@ export class LoginComponent {
     });
   }
 
-  /** Pre-fill credentials for quick demo testing */
-  autofill(role: string) {
+  autofill(role: string): void {
     if (role === 'client') {
       this.loginForm.patchValue({ email: 'client@mototaxi.tn', password: 'Client@123' });
     } else if (role === 'driver') {
@@ -39,7 +38,7 @@ export class LoginComponent {
     }
   }
 
-  onSubmit() {
+  onSubmit(): void {
     if (this.loginForm.invalid) return;
 
     this.isLoading = true;
@@ -48,7 +47,6 @@ export class LoginComponent {
     this.authService.login(this.loginForm.value).subscribe({
       next: (res) => {
         this.isLoading = false;
-        // Redirect based on the role returned by the server
         if (res.role === 'CUSTOMER') {
           this.router.navigate(['/client']);
         } else if (res.role === 'DRIVER') {

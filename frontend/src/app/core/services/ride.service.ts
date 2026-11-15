@@ -48,6 +48,15 @@ export class RideService {
     return this.http.get<RideResponse[]>(`${this.apiUrl}/driver/${driverId}`);
   }
 
+  getPendingRides(driverId?: number): Observable<RideResponse[]> {
+    const url = driverId ? `${this.apiUrl}/pending?driverId=${driverId}` : `${this.apiUrl}/pending`;
+    return this.http.get<RideResponse[]>(url);
+  }
+
+  getActiveRideForDriver(driverId: number): Observable<RideResponse | null> {
+    return this.http.get<RideResponse | null>(`${this.apiUrl}/driver/${driverId}/active`);
+  }
+
   getAdminRides(): Observable<any> {
     return this.http.get<any>(`${environment.apiUrl}/admin/rides?size=25`);
   }

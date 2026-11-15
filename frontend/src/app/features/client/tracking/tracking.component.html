@@ -1,4 +1,4 @@
-<div class="flex-1 flex flex-col relative h-full">
+<div class="flex-1 flex flex-col relative h-full overflow-hidden">
 
   <!-- Map Background -->
   <div class="relative w-full h-[55%] bg-gray-100">
@@ -34,7 +34,7 @@
       <div class="flex items-center justify-between mb-4">
         <div class="flex items-center gap-3">
           <div class="w-12 h-12 rounded-full bg-gray-100 border-2 border-[#F5C518] flex items-center justify-center font-bold text-gray-800 text-base">
-            MB
+            {{ driverName.slice(0, 2).toUpperCase() }}
           </div>
           <div>
             <h3 class="text-sm font-bold text-gray-900">{{ driverName }}</h3>
@@ -54,8 +54,10 @@
           <i class="fa-solid fa-phone text-[#10B981]"></i>
           <span>Appeler</span>
         </a>
-        <button class="flex items-center justify-center gap-2 py-2.5 bg-gray-100 hover:bg-gray-200 rounded-xl text-xs font-bold text-gray-800 transition">
-          <i class="fa-solid fa-comment-dots text-[#F5C518]"></i>
+        <button 
+          (click)="toggleChat()"
+          class="flex items-center justify-center gap-2 py-2.5 bg-[#F5C518] hover:bg-[#E5B50A] text-[#1A1A1A] rounded-xl text-xs font-black shadow-sm transition active:scale-95">
+          <i class="fa-solid fa-comment-dots text-base"></i>
           <span>Message</span>
         </button>
       </div>
@@ -63,22 +65,153 @@
       <!-- Route Info -->
       <div class="bg-gray-50 p-3 rounded-2xl border border-gray-100 space-y-2 text-xs">
         <div class="flex items-center gap-2 text-gray-600">
-          <i class="fa-solid fa-circle-dot text-xs text-gray-400"></i>
-          <span class="truncate font-medium">El Menzah 6, Tunis</span>
+          <i class="fa-solid fa-circle-dot text-xs text-emerald-500"></i>
+          <span class="truncate font-medium">{{ originAddress }}</span>
         </div>
         <div class="flex items-center gap-2 text-gray-900 font-bold">
           <i class="fa-solid fa-location-dot text-xs text-[#F5C518]"></i>
-          <span class="truncate">Avenue Habib Bourguiba, Centre Ville</span>
+          <span class="truncate">{{ destAddress }}</span>
         </div>
       </div>
     </div>
 
     <div class="pt-2">
-      <a routerLink="/client/home" class="block text-center py-2 text-xs text-red-500 font-bold hover:underline">
-        Annuler la course
-      </a>
+      <button 
+        (click)="cancelOrExitRide()" 
+        class="block w-full text-center py-2 text-xs text-red-500 font-bold hover:underline cursor-pointer">
+        Annuler la course / Quitter
+      </button>
     </div>
 
+  </div>
+
+  <!-- SLIDING CHAT NAVIGATION / DRAWER (Messagerie Client <-> Chauffeur) -->
+  <div 
+    *ngIf="isChatOpen" 
+    class="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-end transition-opacity duration-300"
+    style="z-index: 100000 !important;">
+    
+    <div class="w-full sm:w-[420px] bg-white h-full shadow-2xl flex flex-col justify-between animate-slideLeft">
+      
+      <!-- Chat Header -->
+      <div class="bg-[#1A1A1A] text-white p-4 flex items-center justify-between border-b border-white/10">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-full bg-[#F5C518] text-[#1A1A1A] font-black flex items-center justify-center text-sm shadow">
+            {{ driverName.slice(0, 2).toUpperCase() }}
+          </div>
+          <div>
+            <span class="text-[9px] uppercase tracking-wider font-extrabold text-[#F5C518] block">Chauffeur</span>
+            <h4 class="text-sm font-black text-white leading-tight">{{ driverName }}</h4>
+            <span class="text-[10px] text-emerald-400 font-bold flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              En ligne pour cette course #{{ rideId }}
+            </span>
+          </div>
+        </div>
+
+        <button 
+          (click)="toggleChat()" 
+          class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-gray-300 hover:text-white flex items-center justify-center transition">
+          <i class="fa-solid fa-xmark text-sm"></i>
+        </button>
+      </div>
+
+      <!-- Messages Scroll Area -->
+      <div class="flex-1 p-4 overflow-y-auto space-y-3 bg-[#F8F9FA]">
+        
+        <div *ngIf="chatMessages.length === 0" class="py-12 text-center text-gray-400 text-xs space-y-2">
+          <i class="fa-regular fa-comments text-3xl text-gray-300 block"></i>
+          <p>Aucun message pour le moment.</p>
+          <p class="text-[11px]">Envoyez un message pour coordonner votre prise en charge.</p>
+        </div>
+
+        <!-- Bubbles -->
+        <div *ngFor="let msg of chatMessages" class="flex flex-col" [ngClass]="msg.senderRole === 'CUSTOMER' ? 'items-end' : 'items-start'">
+          <span class="text-[10px] font-bold text-gray-400 mb-0.5 px-1">{{ msg.senderName }}</span>
+          <div 
+            class="max-w-[80%] px-4 py-2.5 rounded-2xl text-xs leading-relaxed shadow-sm"
+            [ngClass]="msg.senderRole === 'CUSTOMER' ? 'bg-[#F5C518] text-[#1A1A1A] font-bold rounded-br-sm' : 'bg-white text-gray-800 border border-gray-200 rounded-bl-sm'">
+            {{ msg.content }}
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Quick replies chips -->
+      <div class="px-4 py-2 bg-white border-t border-gray-100 flex gap-2 overflow-x-auto text-[11px]">
+        <button (click)="sendQuickReply('Je suis en bas !')" class="whitespace-nowrap px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-full font-bold text-gray-700 transition">
+          Je suis en bas !
+        </button>
+        <button (click)="sendQuickReply('J\'arrive dans 2 minutes')" class="whitespace-nowrap px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-full font-bold text-gray-700 transition">
+          J'arrive dans 2 min
+        </button>
+        <button (click)="sendQuickReply('Où êtes-vous ?')" class="whitespace-nowrap px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-full font-bold text-gray-700 transition">
+          Où êtes-vous ?
+        </button>
+      </div>
+
+      <!-- Input Bar -->
+      <div class="p-3 bg-white border-t border-gray-200 flex items-center gap-2">
+        <input 
+          type="text" 
+          [(ngModel)]="newTextMessage"
+          (keyup.enter)="sendChatMessage()"
+          placeholder="Écrire un message..."
+          class="flex-1 bg-gray-100 border border-gray-200 rounded-xl px-4 py-2.5 text-xs font-medium text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#F5C518]">
+        
+        <button 
+          (click)="sendChatMessage()"
+          [disabled]="!newTextMessage.trim() || isSendingMessage"
+          class="w-10 h-10 rounded-xl bg-[#F5C518] hover:bg-[#E5B50A] text-[#1A1A1A] flex items-center justify-center shadow-md transition disabled:opacity-40">
+          <i class="fa-solid fa-paper-plane text-xs"></i>
+        </button>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- MODAL FIN DE COURSE & REÇU OFFICIEL -->
+  <div *ngIf="isCompleted" class="fixed inset-0 z-[700] bg-black/60 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
+    <div class="bg-white rounded-3xl p-6 sm:p-8 max-w-sm w-full text-center shadow-2xl space-y-4">
+      <div class="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 mx-auto flex items-center justify-center text-3xl shadow-sm">
+        <i class="fa-solid fa-circle-check"></i>
+      </div>
+      
+      <div>
+        <span class="text-[10px] font-black uppercase text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
+          Course terminée avec succès
+        </span>
+        <h3 class="text-lg font-black text-gray-900 mt-2">Vous êtes bien arrivé !</h3>
+        <p class="text-xs text-gray-500 mt-1">Le chauffeur a clôturé la course. Votre reçu a été déposé dans votre boîte de messages.</p>
+      </div>
+
+      <!-- Mini Reçu Card -->
+      <div class="bg-gray-50 rounded-2xl p-4 border border-gray-100 text-left text-xs space-y-2">
+        <div class="flex justify-between items-center pb-2 border-b border-gray-200">
+          <span class="text-gray-500 font-bold">Montant Réglé</span>
+          <span class="text-base font-black text-[#1A1A1A]">{{ (completedRide?.finalPrice || ride?.estimatedPrice || 0) | number:'1.1-1' }} TND</span>
+        </div>
+        <div class="text-gray-700 text-[11px] truncate">
+          <strong>Départ :</strong> {{ originAddress }}
+        </div>
+        <div class="text-gray-700 text-[11px] truncate">
+          <strong>Arrivée :</strong> {{ destAddress }}
+        </div>
+        <div class="text-gray-700 text-[11px]">
+          <strong>Chauffeur :</strong> {{ driverName }}
+        </div>
+      </div>
+
+      <button 
+        (click)="returnToMainScreen()"
+        class="w-full py-3.5 bg-[#F5C518] hover:bg-[#E5B50A] text-[#1A1A1A] font-black rounded-2xl text-xs shadow-md transition active:scale-95 flex items-center justify-center gap-2">
+        <span>Accéder à l'accueil & Voir mon reçu</span>
+        <i class="fa-solid fa-arrow-right"></i>
+      </button>
+
+      <p class="text-[10px] text-gray-400">Redirection automatique dans un instant...</p>
+    </div>
   </div>
 
 </div>

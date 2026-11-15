@@ -51,6 +51,11 @@ public class Ride {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     @Builder.Default
+    private Driver.VehicleType vehicleType = Driver.VehicleType.MOTO;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    @Builder.Default
     private RideStatus status = RideStatus.PENDING;
 
     @CreationTimestamp

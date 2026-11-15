@@ -33,7 +33,7 @@ public class AuthService {
         );
 
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new BadRequestException("User not found"));
+                .orElseThrow(() -> new BadRequestException("Utilisateur introuvable"));
 
         UserDetails userDetails = userDetailsService.loadUserByUsername(user.getEmail());
         String token = jwtUtil.generateToken(userDetails);
@@ -49,7 +49,7 @@ public class AuthService {
     @Transactional
     public AuthResponse register(RegisterRequest request) {
         if (userRepository.existsByEmail(request.getEmail())) {
-            throw new BadRequestException("Email is already in use");
+            throw new BadRequestException("Cet email est déjà utilisé par un autre compte");
         }
 
         User user = User.builder()
@@ -77,7 +77,7 @@ public class AuthService {
     @Transactional
     public AuthResponse driverRegister(DriverRegistrationRequest request) {
         if (userRepository.existsByEmail(request.getEmail())) {
-            throw new BadRequestException("Email is already in use");
+            throw new BadRequestException("Cet email est déjà utilisé par un autre chauffeur");
         }
 
         User user = User.builder()
